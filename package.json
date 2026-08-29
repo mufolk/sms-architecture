@@ -1,0 +1,20 @@
+{
+  "name": "conversational-sms",
+  "private": true,
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "pnpm --filter @conversational-sms/core db:generate",
+    "db:migrate": "pnpm --filter @conversational-sms/core db:migrate"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  },
+  "packageManager": "pnpm@10.6.5",
+  "engines": {
+    "node": ">=22"
+  }
+}
