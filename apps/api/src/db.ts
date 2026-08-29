@@ -1,4 +1,5 @@
 import { drizzle } from "drizzle-orm/node-postgres";
+import { sql } from "drizzle-orm";
 import pg from "pg";
 import type { Env } from "./env.js";
 
@@ -12,7 +13,8 @@ export function createDb(pool: pg.Pool) {
 
 export async function checkPostgres(pool: pg.Pool): Promise<boolean> {
   try {
-    await pool.query("SELECT 1");
+    const db = drizzle(pool);
+    await db.execute(sql`SELECT 1`);
     return true;
   } catch {
     return false;

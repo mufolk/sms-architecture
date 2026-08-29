@@ -1,12 +1,12 @@
+export const dynamic = "force-dynamic";
+
 type ReadyResponse = {
   status: string;
   postgres?: boolean;
   redis?: boolean;
 };
 
-async function fetchApiReady(): Promise<{ ok: boolean; detail: ReadyResponse | null; error?: string }> {
-  const apiUrl = process.env.API_URL ?? "http://localhost:3000";
-
+async function fetchApiReady(apiUrl: string): Promise<{ ok: boolean; detail: ReadyResponse | null; error?: string }> {
   try {
     const response = await fetch(`${apiUrl}/ready`, { cache: "no-store" });
 
@@ -24,7 +24,8 @@ async function fetchApiReady(): Promise<{ ok: boolean; detail: ReadyResponse | n
 }
 
 export default async function HomePage() {
-  const result = await fetchApiReady();
+  const apiUrl = process.env.API_URL ?? "";
+  const result = await fetchApiReady(apiUrl);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 px-6 py-16">

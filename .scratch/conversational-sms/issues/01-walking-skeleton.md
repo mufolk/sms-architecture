@@ -7,14 +7,14 @@ nobody ever has to run a second setup command.
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `docker compose up` on a clean machine brings up Postgres, Redis, the API and the web app
-- [ ] Migrations run automatically as part of that command; no manual migration step exists
-- [ ] `GET /health` returns 200 whenever the API process is alive
-- [ ] `GET /ready` returns 200 only when Postgres and Redis both answer a real query, and a
+- [x] `docker compose up` on a clean machine brings up Postgres, Redis, the API and the web app
+- [x] Migrations run automatically as part of that command; no manual migration step exists
+- [x] `GET /health` returns 200 whenever the API process is alive
+- [x] `GET /ready` returns 200 only when Postgres and Redis both answer a real query, and a
       non-200 when either is down
-- [ ] Environment variables are validated at startup and the process refuses to boot on a missing
+- [x] Environment variables are validated at startup and the process refuses to boot on a missing
       or malformed value, naming the offending variable
-- [ ] The web app serves a page confirming it can reach the API
-- [ ] Typecheck and the (empty) test suite run green from the workspace root
+- [x] The web app serves a page confirming it can reach the API
+- [x] Typecheck and the (empty) test suite run green from the workspace root

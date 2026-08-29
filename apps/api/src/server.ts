@@ -1,16 +1,11 @@
 import { runMigrations } from "@conversational-sms/core";
-import { loadEnv } from "./env.js";
-import { createPool } from "./db.js";
-import { startServer } from "./index.js";
+import { buildApp } from "./index.js";
 
 async function main() {
-  const env = loadEnv();
-  const pool = createPool(env);
+  const { app, env, pool } = await buildApp();
 
   await runMigrations(pool);
-  await pool.end();
-
-  await startServer();
+  await app.listen({ port: env.PORT, host: "0.0.0.0" });
 }
 
 main().catch((error: unknown) => {
