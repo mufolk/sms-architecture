@@ -121,6 +121,7 @@ describe("minimal loop", () => {
       });
 
       expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ duplicate: false });
 
       const listResponse = await app.inject({ method: "GET", url: "/conversations" });
       const { conversations } = listResponse.json<{ conversations: Array<{ id: string }> }>();
@@ -759,14 +760,73 @@ describe("minimal loop", () => {
         headers: { "content-type": "application/x-www-form-urlencoded" },
         payload,
       });
-      await app.inject({
+      const duplicateResponse = await app.inject({
         method: "POST",
         url: "/webhooks/sms",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         payload,
       });
 
+      expect(duplicateResponse.statusCode).toBe(200);
+      expect(duplicateResponse.json()).toEqual({ duplicate: true });
       expect(enqueueCount).toBe(1);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns duplicate true when the provider message sid was already seen in another conversation", async () => {
+    const smsProvider = createFakeSmsProvider();
+    const { app } = await buildApp({
+      env: baseEnv(infra),
+      deps: { smsProvider },
+    });
+
+    try {
+      const firstResponse = await app.inject({
+        method: "POST",
+        url: "/webhooks/sms",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: twilioBody({
+          messageSid: "SM-CROSS-1",
+          from: "+15554001",
+          to: "+15559999",
+          body: "first conversation",
+        }),
+      });
+
+      expect(firstResponse.statusCode).toBe(200);
+      expect(firstResponse.json()).toEqual({ duplicate: false });
+
+      const secondResponse = await app.inject({
+        method: "POST",
+        url: "/webhooks/sms",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: twilioBody({
+          messageSid: "SM-CROSS-1",
+          from: "+15554002",
+          to: "+15559999",
+          body: "cross conversation replay",
+        }),
+      });
+
+      expect(secondResponse.statusCode).toBe(200);
+      expect(secondResponse.json()).toEqual({ duplicate: true });
+
+      const listResponse = await app.inject({ method: "GET", url: "/conversations" });
+      const { conversations } = listResponse.json<{
+        conversations: Array<{ id: string; userNumber: string }>;
+      }>();
+
+      const replayConversation = conversations.find((conversation) => conversation.userNumber === "+15554002");
+      expect(replayConversation).toBeDefined();
+
+      const messagesResponse = await app.inject({
+        method: "GET",
+        url: `/conversations/${replayConversation!.id}/messages`,
+      });
+      const { messages } = messagesResponse.json<{ messages: Array<{ body: string }> }>();
+      expect(messages).toHaveLength(0);
     } finally {
       await app.close();
     }

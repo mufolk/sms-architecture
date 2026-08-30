@@ -20,6 +20,28 @@ export async function registerConversationRoutes(
     });
   });
 
+  app.get<{ Params: { id: string } }>("/conversations/:id", async (request, reply) => {
+    if (!isUuid(request.params.id)) {
+      return reply.status(404).send({ error: "conversation not found" });
+    }
+
+    const conversation = await deps.conversationRepository.findById(request.params.id);
+    if (!conversation) {
+      return reply.status(404).send({ error: "conversation not found" });
+    }
+
+    return reply.status(200).send({
+      conversation: {
+        id: conversation.id,
+        inboundNumber: conversation.inboundNumber,
+        userNumber: conversation.userNumber,
+        lastMessageAt: conversation.lastMessageAt.toISOString(),
+        needsAttention: conversation.needsAttention,
+        createdAt: conversation.createdAt.toISOString(),
+      },
+    });
+  });
+
   app.get<{ Params: { id: string } }>("/conversations/:id/messages", async (request, reply) => {
     if (!isUuid(request.params.id)) {
       return reply.status(404).send({ error: "conversation not found" });

@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
+import { AppNav } from "../components/AppNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Conversational SMS",
-  description: "Walking skeleton for the conversational SMS system",
+  description: "Admin interface and dev handset for the conversational SMS system",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AppNav />
+        {children}
+      </body>
     </html>
   );
 }

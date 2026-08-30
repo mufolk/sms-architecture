@@ -14,7 +14,7 @@ export async function registerWebhookRoutes(app: FastifyInstance, deps: AppDeps)
 
     try {
       const payload = parseTwilioWebhookBody(body);
-      await handleInboundMessage(
+      const result = await handleInboundMessage(
         {
           smsProvider: deps.smsProvider,
           conversationRepository: deps.conversationRepository,
@@ -23,7 +23,7 @@ export async function registerWebhookRoutes(app: FastifyInstance, deps: AppDeps)
         },
         { headers, body, payload },
       );
-      return reply.status(200).send("");
+      return reply.status(200).send({ duplicate: result.duplicate });
     } catch (error) {
       if (error instanceof InvalidWebhookSignatureError) {
         return reply.status(403).send({ error: "invalid signature" });

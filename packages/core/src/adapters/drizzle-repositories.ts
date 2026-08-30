@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { conversations, messages } from "@conversational-sms/core/schema";
@@ -74,7 +74,10 @@ export function createDrizzleConversationRepository(pool: Pool): ConversationRep
     },
 
     async listAll() {
-      const rows = await db.select().from(conversations).orderBy(conversations.lastMessageAt);
+      const rows = await db
+        .select()
+        .from(conversations)
+        .orderBy(desc(conversations.lastMessageAt), desc(conversations.id));
       return rows.map(mapConversation);
     },
   };
