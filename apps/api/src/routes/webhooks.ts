@@ -5,6 +5,7 @@ import {
 } from "@conversational-sms/core/use-cases/handle-inbound-message";
 import type { FastifyInstance } from "fastify";
 import type { AppDeps } from "../deps.js";
+import { isQueueUnavailableError } from "../queue-errors.js";
 
 export async function registerWebhookRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
   app.post("/webhooks/sms", async (request, reply) => {
@@ -29,6 +30,9 @@ export async function registerWebhookRoutes(app: FastifyInstance, deps: AppDeps)
       }
       if (error instanceof InvalidTwilioWebhookPayloadError) {
         return reply.status(400).send({ error: "invalid payload" });
+      }
+      if (isQueueUnavailableError(error)) {
+        return reply.status(503).send({ error: "queue unavailable" });
       }
       throw error;
     }

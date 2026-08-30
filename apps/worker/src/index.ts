@@ -1,14 +1,14 @@
 import pino from "pino";
 import pg from "pg";
-import { Redis } from "ioredis";
 import { loadEnv } from "./env.js";
 import { createDefaultWorkerConsumer } from "./consumer.js";
+import { createWorkerRedis } from "./redis.js";
 
 async function main() {
   const env = loadEnv();
   const log = pino({ level: env.LOG_LEVEL });
   const pool = new pg.Pool({ connectionString: env.DATABASE_URL });
-  const redis = new Redis(env.REDIS_URL);
+  const redis = createWorkerRedis(env.REDIS_URL);
 
   const consumer = createDefaultWorkerConsumer(pool, redis, env.PROCESSING_DELAY_MS);
   log.info("Worker consumer started");

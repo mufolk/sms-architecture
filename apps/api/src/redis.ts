@@ -1,10 +1,12 @@
 import { Redis } from "ioredis";
+import { createBullMqRedis } from "@conversational-sms/core/adapters/bullmq-redis";
 import type { Env } from "./env.js";
 
 export function createRedis(env: Env): Redis {
-  return new Redis(env.REDIS_URL, {
-    maxRetriesPerRequest: null,
+  return createBullMqRedis(env.REDIS_URL, {
     lazyConnect: true,
+    connectTimeout: 2_000,
+    enableOfflineQueue: false,
   });
 }
 

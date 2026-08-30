@@ -1,0 +1,1353 @@
+{
+  "info": {
+    "_postman_id": "6f7f590d-125f-448b-a554-b5e06bf9fe20",
+    "name": "Conversational SMS — QA",
+    "description": "QA battery for the conversational-sms API (tickets 01 and 02).\n\nHow to use:\n1. `docker compose up -d --build` at the repo root.\n2. Import `postman-environment.json` too and select the Local environment.\n3. Fire folder by folder, or run the whole collection in the Runner with a 400ms delay.\n\nEvery folder passes with the stack up. Folder 6 needs the worker running; folder 7 is written to pass whether Redis is up or down, so a full run stays green.\n\nDrive through POST /webhooks/sms, observe through the admin REST — the seam from ADR-0011.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('status ok', () => pm.expect(pm.response.json().status).to.eql('ok'));",
+                  "pm.test('answers under 1s', () => pm.expect(pm.response.responseTime).to.be.below(1000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /ready",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('postgres ready', () => pm.expect(b.postgres).to.be.true);",
+                  "pm.test('redis ready', () => pm.expect(b.redis).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ready"
+              ]
+            },
+            "description": "503 when Postgres or Redis is down."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Webhook — happy path",
+      "item": [
+        {
+          "name": "POST /webhooks/sms (new message)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a fresh MessageSid per run, kept for the redelivery folder",
+                  "const sid = 'SM' + pm.variables.replaceIn('{{$timestamp}}') + Math.floor(Math.random() * 1e6);",
+                  "pm.collectionVariables.set('messageSid', sid);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('well under Twilio\\'s 5s ceiling', () => pm.expect(pm.response.responseTime).to.be.below(5000));",
+                  "pm.test('empty body', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.collectionVariables.set('lastMessageSid', pm.collectionVariables.get('messageSid'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "{{messageSid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "{{userNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "{{inboundNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Body",
+                  "value": "Hello, testing",
+                  "type": "text"
+                },
+                {
+                  "key": "AccountSid",
+                  "value": "AC00000000000000000000000000000000",
+                  "type": "text"
+                },
+                {
+                  "key": "NumSegments",
+                  "value": "1",
+                  "type": "text"
+                }
+              ]
+            },
+            "description": "Twilio posts application/x-www-form-urlencoded. The API answers 200 with an empty body and enqueues the processing. Twilio's ceiling is 5s."
+          }
+        },
+        {
+          "name": "POST /webhooks/sms (unicode and emoji)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a fresh MessageSid per run, kept for the redelivery folder",
+                  "const sid = 'SM' + pm.variables.replaceIn('{{$timestamp}}') + Math.floor(Math.random() * 1e6);",
+                  "pm.collectionVariables.set('messageSid', sid);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "{{messageSid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "{{userNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "{{inboundNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Body",
+                  "value": "Olá 🚀 ação — çãé",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /webhooks/sms (empty Body)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a fresh MessageSid per run, kept for the redelivery folder",
+                  "const sid = 'SM' + pm.variables.replaceIn('{{$timestamp}}') + Math.floor(Math.random() * 1e6);",
+                  "pm.collectionVariables.set('messageSid', sid);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 — an empty Body is accepted', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "{{messageSid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "{{userNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "{{inboundNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Body",
+                  "value": "",
+                  "type": "text"
+                }
+              ]
+            },
+            "description": "A present but empty Body is valid — only a missing field is a 400."
+          }
+        },
+        {
+          "name": "POST /webhooks/sms (2000-char Body)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a fresh MessageSid per run, kept for the redelivery folder",
+                  "const sid = 'SM' + pm.variables.replaceIn('{{$timestamp}}') + Math.floor(Math.random() * 1e6);",
+                  "pm.collectionVariables.set('messageSid', sid);",
+                  "pm.collectionVariables.set('longBody', 'A'.repeat(2000));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "{{messageSid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "{{userNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "{{inboundNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Body",
+                  "value": "{{longBody}}",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Webhook — invalid payload",
+      "item": [
+        {
+          "name": "Missing Body → 400",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a fresh MessageSid per run, kept for the redelivery folder",
+                  "const sid = 'SM' + pm.variables.replaceIn('{{$timestamp}}') + Math.floor(Math.random() * 1e6);",
+                  "pm.collectionVariables.set('messageSid', sid);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));",
+                  "pm.test('invalid payload', () => pm.expect(pm.response.json().error).to.eql('invalid payload'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "{{messageSid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "{{userNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "{{inboundNumber}}",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Missing From → 400",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a fresh MessageSid per run, kept for the redelivery folder",
+                  "const sid = 'SM' + pm.variables.replaceIn('{{$timestamp}}') + Math.floor(Math.random() * 1e6);",
+                  "pm.collectionVariables.set('messageSid', sid);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "{{messageSid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "{{inboundNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Body",
+                  "value": "x",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Missing To → 400",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a fresh MessageSid per run, kept for the redelivery folder",
+                  "const sid = 'SM' + pm.variables.replaceIn('{{$timestamp}}') + Math.floor(Math.random() * 1e6);",
+                  "pm.collectionVariables.set('messageSid', sid);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "{{messageSid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "{{userNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Body",
+                  "value": "x",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Empty MessageSid → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "{{userNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "{{inboundNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Body",
+                  "value": "x",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Empty body → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "JSON content type → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"MessageSid\":\"SM1\",\"From\":\"+5511999990001\",\"To\":\"+5511888880001\",\"Body\":\"json\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The API only speaks Twilio's form encoding; JSON lands as an invalid payload."
+          }
+        },
+        {
+          "name": "GET on the webhook → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Redelivery (ADR-0004)",
+      "item": [
+        {
+          "name": "Replay the last MessageSid → 200, no duplicate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('lastMessageSid is set (run the happy path first)', () => {",
+                  "  pm.expect(pm.collectionVariables.get('lastMessageSid')).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "{{lastMessageSid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "{{userNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "{{inboundNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Body",
+                  "value": "Hello, testing",
+                  "type": "text"
+                }
+              ]
+            },
+            "description": "Run 'POST /webhooks/sms (new message)' first. The redelivery is absorbed: no new Message, no second reply. A late reply beats a duplicate reply."
+          }
+        },
+        {
+          "name": "Replay with a tampered Body → ignored",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "{{lastMessageSid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "{{userNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "{{inboundNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Body",
+                  "value": "TAMPERED CONTENT",
+                  "type": "text"
+                }
+              ]
+            },
+            "description": "The MessageSid already seen wins; the new body is discarded."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Admin REST",
+      "item": [
+        {
+          "name": "GET /conversations",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const cs = pm.response.json().conversations;",
+                  "pm.test('conversations is an array', () => pm.expect(cs).to.be.an('array'));",
+                  "const mine = cs.filter(c => c.userNumber === pm.collectionVariables.get('userNumber'));",
+                  "if (mine.length) {",
+                  "  pm.collectionVariables.set('conversationId', mine[mine.length - 1].id);",
+                  "  console.log('conversationId =', mine[mine.length - 1].id);",
+                  "} else if (cs.length) {",
+                  "  pm.collectionVariables.set('conversationId', cs[cs.length - 1].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations"
+              ]
+            },
+            "description": "Today the list comes back ascending by lastMessageAt (most recent last). Ticket 03 asks for the opposite."
+          }
+        },
+        {
+          "name": "GET /conversations/:id/messages",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const ms = pm.response.json().messages;",
+                  "pm.test('has an inbound message', () => pm.expect(ms.some(m => m.direction === 'inbound')).to.be.true);",
+                  "const pending = ms.filter(m => m.direction === 'inbound' && m.status !== 'processed');",
+                  "console.log(ms.length + ' message(s), ' + pending.length + ' inbound still pending');",
+                  "ms.forEach(m => console.log(m.direction, m.status, JSON.stringify(m.body).slice(0, 60)));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/{{conversationId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                "{{conversationId}}",
+                "messages"
+              ]
+            },
+            "description": "Run 'GET /conversations' first — it fills conversationId."
+          }
+        },
+        {
+          "name": "Unknown conversation → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));",
+                  "pm.test('conversation not found', () => pm.expect(pm.response.json().error).to.eql('conversation not found'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/11111111-1111-4111-8111-111111111111/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                "11111111-1111-4111-8111-111111111111",
+                "messages"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Malformed id → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));",
+                  "pm.test('conversation not found', () => pm.expect(pm.response.json().error).to.eql('conversation not found'));",
+                  "pm.test('no internal Postgres error leaks', () => pm.expect(pm.response.text()).to.not.include('22P02'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/abc/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                "abc",
+                "messages"
+              ]
+            },
+            "description": "An id that is not a UUID is rejected at the edge, before Postgres is touched. It used to answer 500 with the raw Postgres error (22P02)."
+          }
+        },
+        {
+          "name": "Quote-injection id → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));",
+                  "pm.test('no internal Postgres error leaks', () => pm.expect(pm.response.text()).to.not.include('22P02'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/' OR 1=1--/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                "' OR 1=1--",
+                "messages"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. End to end (run the folder in the Runner)",
+      "description": "Posts a new Message, finds the Conversation and polls until the reply is out. Needs the worker running. With PROCESSING_DELAY_MS=3000 the reply takes ~3s.",
+      "item": [
+        {
+          "name": "E2E 1 — post the message",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const stamp = pm.variables.replaceIn('{{$timestamp}}');",
+                  "pm.collectionVariables.set('messageSid', 'SME2E' + stamp);",
+                  "// a fresh number per run isolates this test's conversation",
+                  "pm.collectionVariables.set('e2eNumber', '+5511' + String(stamp).slice(-9));",
+                  "pm.collectionVariables.set('pollAttempt', 0);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('under Twilio\\'s 5s ceiling', () => pm.expect(pm.response.responseTime).to.be.below(5000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "{{messageSid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "{{e2eNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "{{inboundNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Body",
+                  "value": "ping e2e",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "E2E 2 — find the conversation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cs = pm.response.json().conversations;",
+                  "const mine = cs.filter(c => c.userNumber === pm.collectionVariables.get('e2eNumber'));",
+                  "pm.test('the conversation was created', () => pm.expect(mine.length).to.eql(1));",
+                  "if (mine.length) pm.collectionVariables.set('e2eConversationId', mine[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations"
+              ]
+            }
+          }
+        },
+        {
+          "name": "E2E 3 — poll until the reply is out",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ms = pm.response.json().messages;",
+                  "const inbound = ms.find(m => m.direction === 'inbound');",
+                  "const outbound = ms.find(m => m.direction === 'outbound');",
+                  "let n = Number(pm.collectionVariables.get('pollAttempt') || 0) + 1;",
+                  "pm.collectionVariables.set('pollAttempt', n);",
+                  "",
+                  "if (!outbound && n < 20) {",
+                  "  console.log('attempt ' + n + ': no reply yet (inbound=' + (inbound && inbound.status) + ')');",
+                  "  pm.execution.setNextRequest('E2E 3 — poll until the reply is out');",
+                  "} else {",
+                  "  pm.test('the reply went out', () => pm.expect(outbound, 'no outbound after ' + n + ' attempts — is the worker up?').to.exist);",
+                  "  if (outbound) {",
+                  "    pm.test('the reply echoes the inbound text', () => pm.expect(outbound.body).to.eql('Reply: ' + inbound.body));",
+                  "    pm.test('the reply points at the inbound message', () => pm.expect(outbound.inReplyTo).to.eql(inbound.id));",
+                  "    pm.test('the reply is marked sent', () => pm.expect(outbound.status).to.eql('sent'));",
+                  "    pm.test('the inbound is marked processed', () => pm.expect(inbound.status).to.eql('processed'));",
+                  "    pm.test('the fake provider sid is filled in', () => pm.expect(outbound.providerMessageSid).to.match(/^FAKE/));",
+                  "  }",
+                  "  pm.execution.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/{{e2eConversationId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                "{{e2eConversationId}}",
+                "messages"
+              ]
+            },
+            "description": "Repeats itself until the outbound Message shows up (20 attempts max). In the Runner, set a 1000ms delay between requests."
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Degraded — Redis down",
+      "description": "Stop Redis with `docker compose stop redis`, run this folder, then bring it back with `docker compose start redis`. The requests also pass with Redis up, so the folder is safe inside a full run.",
+      "item": [
+        {
+          "name": "Webhook fails fast instead of hanging",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a fresh MessageSid per run, kept for the redelivery folder",
+                  "const sid = 'SM' + pm.variables.replaceIn('{{$timestamp}}') + Math.floor(Math.random() * 1e6);",
+                  "pm.collectionVariables.set('messageSid', sid);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers well under Twilio\\'s 5s ceiling', () => pm.expect(pm.response.responseTime).to.be.below(5000));",
+                  "if (pm.response.code === 503) {",
+                  "  pm.test('queue unavailable', () => pm.expect(pm.response.json().error).to.eql('queue unavailable'));",
+                  "} else {",
+                  "  pm.test('200 — Redis is up, nothing degraded here', () => pm.response.to.have.status(200));",
+                  "  console.log('Redis is up: stop it to exercise the degraded path.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "sms"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "{{messageSid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "{{userNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "{{inboundNumber}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Body",
+                  "value": "redis down",
+                  "type": "text"
+                }
+              ]
+            },
+            "description": "With Redis down the enqueue must give up in ~2s and answer 503, never hang past Twilio's timeout. The Message is already persisted at that point: the redelivery is deduplicated and it stays in 'received' until the reaper lands (ticket 05)."
+          }
+        },
+        {
+          "name": "Admin reads keep serving",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('answers under 2s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations"
+              ]
+            },
+            "description": "Postgres is untouched by a Redis outage; the admin list must stay up."
+          }
+        },
+        {
+          "name": "GET /ready reports the outage",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('status matches the redis flag', () => {",
+                  "  pm.expect(pm.response.code).to.eql(b.redis ? 200 : 503);",
+                  "});",
+                  "if (!b.redis) console.log('Redis down, as expected for this folder.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ready"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Web (apps/web)",
+      "item": [
+        {
+          "name": "GET / (skeleton page)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('the page can see the API', () => pm.expect(pm.response.text()).to.include('API reachable'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{webBaseUrl}}/",
+              "host": [
+                "{{webBaseUrl}}"
+              ],
+              "path": []
+            },
+            "description": "Today the web only renders the API's /ready state. The Conversations screen arrives with ticket 03."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "webBaseUrl",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "userNumber",
+      "value": "+5511999990001"
+    },
+    {
+      "key": "inboundNumber",
+      "value": "+5511888880001"
+    },
+    {
+      "key": "messageSid",
+      "value": ""
+    },
+    {
+      "key": "lastMessageSid",
+      "value": ""
+    },
+    {
+      "key": "conversationId",
+      "value": ""
+    },
+    {
+      "key": "e2eNumber",
+      "value": ""
+    },
+    {
+      "key": "e2eConversationId",
+      "value": ""
+    },
+    {
+      "key": "pollAttempt",
+      "value": "0"
+    },
+    {
+      "key": "longBody",
+      "value": ""
+    }
+  ]
+}

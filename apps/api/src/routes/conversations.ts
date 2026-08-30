@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { AppDeps } from "../deps.js";
+import { isUuid } from "../ids.js";
 
 export async function registerConversationRoutes(
   app: FastifyInstance,
@@ -20,6 +21,10 @@ export async function registerConversationRoutes(
   });
 
   app.get<{ Params: { id: string } }>("/conversations/:id/messages", async (request, reply) => {
+    if (!isUuid(request.params.id)) {
+      return reply.status(404).send({ error: "conversation not found" });
+    }
+
     const conversation = await deps.conversationRepository.findById(request.params.id);
     if (!conversation) {
       return reply.status(404).send({ error: "conversation not found" });

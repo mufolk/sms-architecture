@@ -11,6 +11,7 @@ import type { MessageProcessor } from "../packages/core/src/ports/message-proces
 import type { SmsProvider } from "../packages/core/src/ports/sms-provider.js";
 import type { Message, ProcessJobPayload } from "../packages/core/src/domain/types.js";
 import { loadEnv as loadWorkerEnv } from "../apps/worker/src/env.js";
+import { createWorkerRedis } from "../apps/worker/src/redis.js";
 import { baseEnv, startTestInfrastructure, type TestInfrastructure } from "./helpers/infrastructure.js";
 
 function twilioBody(params: {
@@ -866,6 +867,51 @@ describe("minimal loop", () => {
       await app.close();
     }
   });
+
+  it("returns 404 for a conversation id outside UUID format", async () => {
+    const { app } = await buildApp({ env: baseEnv(infra) });
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/conversations/abc/messages",
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.body).not.toContain("22P02");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns 503 quickly when the queue is unavailable", async () => {
+    const { app } = await buildApp({
+      env: {
+        ...baseEnv(infra),
+        REDIS_URL: "redis://127.0.0.1:63999",
+      },
+    });
+
+    try {
+      const started = Date.now();
+      const response = await app.inject({
+        method: "POST",
+        url: "/webhooks/sms",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: twilioBody({
+          messageSid: "SM904",
+          from: "+15550017",
+          to: "+15559999",
+          body: "queue down",
+        }),
+      });
+
+      expect(response.statusCode).toBe(503);
+      expect(Date.now() - started).toBeLessThan(5_000);
+    } finally {
+      await app.close();
+    }
+  });
 });
 
 describe("worker environment validation", () => {
@@ -935,12 +981,12 @@ describe("worker bootstrap", () => {
   }, 30_000);
 
   it("creates the default worker consumer", async () => {
-    const { app, redis } = await buildApp({ env: baseEnv(infra) });
+    const redis = createWorkerRedis(infra.redisUrl);
     const consumer = createDefaultWorkerConsumer(pool, redis, 0);
     try {
       await consumer.close();
     } finally {
-      await app.close();
+      await redis.quit();
     }
   });
 });

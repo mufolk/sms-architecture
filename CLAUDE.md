@@ -5,6 +5,9 @@ admin web interface over the history. See [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 `AGENTS.md` is a symlink to this file — both names resolve to the same instructions.
 
+Everything committed to this repository is written in English — code, comments, glossary, ADRs,
+tickets, commit messages. The conversation with me happens in Portuguese; the artefacts do not.
+
 ## Read before changing code
 
 - `CONTEXT.md` — the domain glossary. Every name you write uses these terms; each entry lists the
@@ -41,9 +44,11 @@ lowest-numbered ticket whose "Blocked by" list is complete. Do not start a secon
 
 ## Agent skills
 
-Portable skills live in `.cursor/skills/` and are read by Cursor. `implement`, `tdd` and
-`code-review` are available; `implement` is repo-specific and knows the ticket layout and the
-agreed seam.
+Portable skills live in `.cursor/skills/` and are read by Cursor; `.claude/skills/` symlinks the
+repo-specific ones so Claude Code sees the same files. `implement`, `tdd`, `code-review` and
+`review-work` are available. `implement` and `review-work` are repo-specific and know the ticket
+layout and the agreed seam; `review-work` reviews an agent-authored diff under
+`.scratch/conversational-sms/swe-rules.md`.
 
 ### Issue tracker
 
