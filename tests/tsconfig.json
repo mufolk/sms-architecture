@@ -6,5 +6,10 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext"
   },
-  "include": ["./**/*.ts", "../apps/api/src/**/*.ts", "../packages/core/src/**/*.ts"]
+  "include": [
+    "./**/*.ts",
+    "../apps/api/src/**/*.ts",
+    "../apps/worker/src/**/*.ts",
+    "../packages/core/src/**/*.ts"
+  ]
 }

@@ -15,9 +15,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
 
   if (!result.success) {
     const firstIssue = result.error.issues[0];
-    const variable = firstIssue?.path[0];
-    const name = typeof variable === "string" ? variable : "unknown";
-    console.error(`Invalid environment variable ${name}: ${firstIssue?.message ?? "invalid value"}`);
+    const name = String(firstIssue?.path[0] ?? "unknown");
+    console.error(`Invalid environment variable ${name}: ${firstIssue?.message}`);
     process.exit(1);
   }
 

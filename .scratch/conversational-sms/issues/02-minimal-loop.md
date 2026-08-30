@@ -10,22 +10,22 @@ and the provider. Everything after this ticket deepens a path that already works
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Posting an inbound SMS payload to the webhook returns 200 well inside the 5-second budget
+- [x] Posting an inbound SMS payload to the webhook returns 200 well inside the 5-second budget
       and does no processing on that request
-- [ ] A Conversation is created on first contact, identified by the (Inbound Number, User Number)
+- [x] A Conversation is created on first contact, identified by the (Inbound Number, User Number)
       pair, and reused for subsequent messages from the same pair
-- [ ] The Inbound Message is persisted before the request returns
-- [ ] The job is enqueued only after the database transaction commits
-- [ ] The worker runs as a separate process, not as background work inside the API
-- [ ] Processing takes a configurable simulated delay, defaulting to the 3–15 second range and
+- [x] The Inbound Message is persisted before the request returns
+- [x] The job is enqueued only after the database transaction commits
+- [x] The worker runs as a separate process, not as background work inside the API
+- [x] Processing takes a configurable simulated delay, defaulting to the 3–15 second range and
       set low in tests
-- [ ] The reply leaves through the provider as an Outbound Message that records which Inbound
+- [x] The reply leaves through the provider as an Outbound Message that records which Inbound
       Message it answers
-- [ ] Both Messages are retrievable over HTTP for the Conversation, in chronological order
-- [ ] The domain package imports neither the web framework nor the provider SDK
-- [ ] An end-to-end test drives the webhook and asserts on what reached the fake provider
+- [x] Both Messages are retrievable over HTTP for the Conversation, in chronological order
+- [x] The domain package imports neither the web framework nor the provider SDK
+- [x] An end-to-end test drives the webhook and asserts on what reached the fake provider
 
 ## How to work it
 
@@ -56,7 +56,7 @@ when this ticket ends.
 
 ### Gates
 
-- [ ] `pnpm typecheck` green
-- [ ] `pnpm lint` green
-- [ ] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
-- [ ] Every acceptance criterion above checked off, or reported plainly as not done and why
+- [x] `pnpm typecheck` green
+- [x] `pnpm lint` green
+- [x] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
+- [x] Every acceptance criterion above checked off, or reported plainly as not done and why

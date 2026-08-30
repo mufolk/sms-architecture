@@ -41,6 +41,24 @@ services:
       redis:
         condition: service_healthy
 
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/conversational_sms
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: info
+      PROCESSING_DELAY_MS: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+
   web:
     build:
       context: .

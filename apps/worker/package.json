@@ -11,10 +11,15 @@
   },
   "dependencies": {
     "@conversational-sms/core": "workspace:*",
+    "bullmq": "^6.3.2",
+    "drizzle-orm": "^0.40.0",
+    "ioredis": "^5.6.0",
+    "pg": "^8.14.1",
     "pino": "^9.6.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/pg": "^8.11.11",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }
