@@ -7,10 +7,6 @@ export function createPool(env: Env): pg.Pool {
   return new pg.Pool({ connectionString: env.DATABASE_URL });
 }
 
-export function createDb(pool: pg.Pool) {
-  return drizzle(pool);
-}
-
 export async function checkPostgres(pool: pg.Pool): Promise<boolean> {
   try {
     const db = drizzle(pool);

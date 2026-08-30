@@ -27,3 +27,31 @@ This ticket delivers the first of the two centrepiece tests.
 - [ ] **Centrepiece test:** delivering the same webhook payload twice produces exactly one
       Outbound Message
 - [ ] A test covers the redelivery arriving while the first is still processing
+
+## How to work it
+
+Red → green → refactor, one criterion at a time, at the seam of ADR-0011. The loop and the gates
+are in [00-definition-of-done.md](./00-definition-of-done.md).
+
+### Test order
+
+The centrepiece test is the first test, and it fails for a different reason at each slice.
+
+1. Deliver the same payload twice → exactly one Outbound Message reached the fake provider.
+2. Push it down to the database: a second row for the same (provider, Provider Message SID) is
+   refused by the unique constraint, and the webhook inserts on-conflict-do-nothing and detects
+   that nothing was inserted.
+3. Redelivery returns 200, enqueues nothing, sends nothing — including while the first is still
+   processing.
+4. Queue job identity equal to the Provider Message SID, so the duplicate dies before any work.
+5. The Outbound row is written before the provider call, carrying the idempotency key.
+
+Branch coverage bites here: the "nothing was inserted" path is the one that matters, so it gets its
+own test rather than riding along with the happy path.
+
+### Gates
+
+- [ ] `pnpm typecheck` green
+- [ ] `pnpm lint` green
+- [ ] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
+- [ ] Every acceptance criterion above checked off, or reported plainly as not done and why

@@ -27,3 +27,34 @@ Message can become delivered or undelivered in front of the operator's eyes.
       distinctly from failed
 - [ ] A test drives a send through to delivered and asserts the operator-visible status at each
       step
+
+## How to work it
+
+Red → green → refactor, one criterion at a time, at the seam of ADR-0011. The loop and the gates
+are in [00-definition-of-done.md](./00-definition-of-done.md).
+
+### Test order
+
+Two state machines, so two red-green sequences. Illegal transitions before the happy path — the
+rejection is the behaviour worth having.
+
+1. An illegal transition is rejected, in each direction's machine.
+2. The inbound path received → processing → processed, and its failed branch.
+3. The outbound path queued → sent, with the append-only transition record carrying reason and
+   attempt.
+4. The Delivery Receipt endpoint moves sent → delivered, then → undelivered.
+5. A receipt for an unknown SID is handled without error; out-of-order and repeated receipts never
+   move a Message backwards.
+6. The fake provider's on-demand receipt, `/dev` exposure, and the admin's sent/delivered and
+   undelivered/failed distinctions.
+7. The end-to-end test asserting the operator-visible status at each step.
+
+Every rejected-transition branch needs its own test; this is the ticket where branch coverage is
+earned or lost.
+
+### Gates
+
+- [ ] `pnpm typecheck` green
+- [ ] `pnpm lint` green
+- [ ] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
+- [ ] Every acceptance criterion above checked off, or reported plainly as not done and why

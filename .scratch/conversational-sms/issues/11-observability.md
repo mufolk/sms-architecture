@@ -25,3 +25,30 @@ the log to separate.
 - [ ] The readiness endpoint reflects real dependency health rather than process liveness
 - [ ] Metrics worth alerting on are named in the architecture document even where not emitted:
       queue depth, processing latency, failure rate by error class
+
+## How to work it
+
+Red → green → refactor, one criterion at a time, at the seam of ADR-0011. The loop and the gates
+are in [00-definition-of-done.md](./00-definition-of-done.md).
+
+### Test order
+
+Logs are an observable output here, so the tests capture the structured stream rather than reading
+free text.
+
+1. The correlation identifier is generated at the webhook, stored on the Message, and appears on
+   every worker log line for that attempt.
+2. It is recorded on each status transition.
+3. A reaper re-enqueue is distinguishable from the original attempt while the Provider Message SID
+   stays the same on both — this is the whole point of ADR-0009, so it gets its own test.
+4. No message body and no full phone number at default verbosity — assert on the redaction.
+5. Readiness reflects real dependency health.
+
+Metrics that are named but not emitted go in `ARCHITECTURE.md`; they are not a test.
+
+### Gates
+
+- [ ] `pnpm typecheck` green
+- [ ] `pnpm lint` green
+- [ ] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
+- [ ] Every acceptance criterion above checked off, or reported plainly as not done and why

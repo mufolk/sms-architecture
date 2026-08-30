@@ -28,3 +28,33 @@ This ticket delivers the second centrepiece test, and the control point that mak
       Message and the reply still goes out
 - [ ] A test confirms that stopping the worker entirely does not stop ingestion: messages are
       still accepted and are processed once it returns
+
+## How to work it
+
+Red → green → refactor, one criterion at a time, at the seam of ADR-0011. The loop and the gates
+are in [00-definition-of-done.md](./00-definition-of-done.md).
+
+### Test order
+
+The swappable queue client comes first, because without it the centrepiece test cannot be
+written at all.
+
+1. Make the queue client swappable at the `apps/api` composition root, and prove the seam can
+   install one that fails the enqueue after the commit.
+2. Centrepiece: with that failing enqueue, the reaper recovers the Message and the reply still
+   goes out.
+3. The received-past-threshold and processing-past-timeout scans, one test each.
+4. Outbound left queued past the send timeout is reconciled against the provider — assert
+   explicitly that no blind resend happened.
+5. A reaper pass overlapping a live job causes no duplicate work.
+6. Stopping the worker does not stop ingestion; messages are processed once it returns.
+
+The reaper's timers are a refactor target once green: the thresholds are configuration, not
+literals scattered through the scan.
+
+### Gates
+
+- [ ] `pnpm typecheck` green
+- [ ] `pnpm lint` green
+- [ ] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
+- [ ] Every acceptance criterion above checked off, or reported plainly as not done and why

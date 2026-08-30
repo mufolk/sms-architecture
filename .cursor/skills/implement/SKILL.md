@@ -12,12 +12,15 @@ entirely complete. One ticket per session — do not start the next one.
 
 Read, in this order:
 
-1. The ticket file itself. Its acceptance criteria are the definition of done — all of them.
-2. `.scratch/conversational-sms/spec.md` — the decisions behind the ticket.
-3. `CONTEXT.md` — the domain glossary. Every name you write (types, functions, tests, columns)
+1. The ticket file itself. Its acceptance criteria are the definition of done — all of them, and
+   its **How to work it** section gives the order the tests come in.
+2. `.scratch/conversational-sms/issues/00-definition-of-done.md` — the loop and the gates that
+   bind every ticket.
+3. `.scratch/conversational-sms/spec.md` — the decisions behind the ticket.
+4. `CONTEXT.md` — the domain glossary. Every name you write (types, functions, tests, columns)
    uses these terms. The glossary lists, per term, the synonyms to avoid.
-4. `docs/adr/` — the ADRs touching the area. There are eleven and they are short.
-5. `ARCHITECTURE.md` — the section relevant to this ticket.
+5. `docs/adr/` — the ADRs touching the area. There are eleven and they are short.
+6. `ARCHITECTURE.md` — the section relevant to this ticket.
 
 If your implementation would contradict an ADR, **stop and say so** rather than silently
 overriding it. The ADR may deserve reopening; that is the user's call, not yours.
@@ -37,26 +40,47 @@ a defect, not extra coverage.
 
 Follow `/tdd` for what makes a test worth keeping. The rules that bind here:
 
-- **Red before green.** Failing test first, then the minimum code that passes it.
-- **Vertical slices.** One acceptance criterion → one test → one implementation → repeat. Never
-  write all the tests first.
-- **Refactoring is not part of the loop.** It happens at review.
+- **Red before green.** Failing test first, watched failing, then the minimum code that passes it.
+  A test that passes on its first run is wrong.
+- **Vertical slices.** One acceptance criterion → one test → one implementation → refactor →
+  repeat. Never write all the tests first.
+- **Refactor inside the slice**, with the bar green, touching only what the slice touched. The
+  deeper restructuring still belongs to review.
 
-Run typechecking often. Run the single test file you are working on often. Run the full suite once
-at the end.
+Run typechecking often. Run the single test file you are working on often. Run the gates once at
+the end.
+
+## The gates
+
+```
+pnpm verify        # pnpm typecheck && pnpm lint && pnpm test
+```
+
+`pnpm test` runs Vitest with V8 coverage and fails below **90% on lines, branches, functions and
+statements**. Coverage covers `apps/api/src`, `apps/worker/src` and `packages/core/src`; `apps/web`,
+generated schema and the three process bootstraps are excluded — so no logic goes in
+`apps/api/src/server.ts`, `apps/worker/src/index.ts` or the `packages/core/src/index.ts` barrel.
+
+Reaching the branch threshold from one seam means writing the failure-path tests. Do not reach it
+by disabling a rule, lowering a threshold, adding a coverage-ignore comment, or widening the
+exclude list. If a branch is unreachable from the seam, delete the branch.
+
+A red gate means the ticket is not done. If a gate cannot be run, say why — never "should pass".
 
 ## Finishing
 
 1. Every acceptance criterion in the ticket is checked off, or you state plainly which is not and
    why. A partially done ticket is reported as partially done.
-2. Run `/code-review` against the commit you started from.
-3. If implementation taught something that belongs in the glossary or an ADR, put it there — not
+2. `pnpm verify` is green, and its real output is what you report.
+3. Run `/code-review` against the commit you started from.
+4. If implementation taught something that belongs in the glossary or an ADR, put it there — not
    patched into `ARCHITECTURE.md`, which is a document about decisions, not a scratch pad.
-4. Commit to the current branch. One commit per ticket, its message naming the ticket number.
+5. Commit to the current branch. One commit per ticket, its message naming the ticket number.
 
 ## Do not
 
 - Start a second ticket.
+- Lower a coverage threshold, silence a lint rule, or exclude a file to make a gate pass.
 - Build anything in the spec's **Out of Scope** list. Authentication, a real LLM processor, SSE,
   rate limiting, table partitioning and browser tests are all deliberately excluded.
 - "Fix" either of these two behaviours — both are deliberate and documented:

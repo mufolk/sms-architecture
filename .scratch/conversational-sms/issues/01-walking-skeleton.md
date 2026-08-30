@@ -18,3 +18,10 @@ nobody ever has to run a second setup command.
       or malformed value, naming the offending variable
 - [x] The web app serves a page confirming it can reach the API
 - [x] Typecheck and the (empty) test suite run green from the workspace root
+
+## Retrofit note
+
+The TDD loop and the gates in [00-definition-of-done.md](./00-definition-of-done.md) were added
+after this ticket shipped. It is not reopened, but it leaves one debt the gates now see:
+`apps/worker/src/env.ts` is uncovered, so `pnpm test` fails the 90% threshold until ticket 02 runs
+the worker's consumer in the test process. Ticket 02 owns closing it.

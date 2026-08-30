@@ -3,8 +3,8 @@ import { loadEnv } from "./env.js";
 import { checkPostgres, createPool } from "./db.js";
 import { checkRedis, createRedis } from "./redis.js";
 
-export async function buildApp() {
-  const env = loadEnv();
+export async function buildApp(envSource: NodeJS.ProcessEnv = process.env) {
+  const env = loadEnv(envSource);
   const pool = createPool(env);
   const redis = createRedis(env);
 
@@ -45,10 +45,4 @@ export async function buildApp() {
   });
 
   return { app, env, pool, redis };
-}
-
-export async function startServer() {
-  const { app, env } = await buildApp();
-  await app.listen({ port: env.PORT, host: "0.0.0.0" });
-  return app;
 }

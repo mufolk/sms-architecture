@@ -23,3 +23,29 @@ demonstrable to a human, not only to a test.
       processing appears without user action
 - [ ] The `/dev` page sends a message as a chosen User Number to a chosen Inbound Number
 - [ ] Sending from `/dev` and watching the admin shows the reply arriving without a refresh
+
+## How to work it
+
+Red → green → refactor, one criterion at a time, at the seam of ADR-0011. The loop and the gates
+are in [00-definition-of-done.md](./00-definition-of-done.md).
+
+### Test order
+
+The admin REST is half the observation surface of the seam, so it is tested; the React views and
+`/dev` are verified by hand and are outside coverage.
+
+1. The list endpoint returns Conversations ordered by most recent activity, reading the value
+   maintained on the Conversation — assert the ordering changes when a new Message arrives.
+2. The thread endpoint returns every Message in order with direction, status, and the Inbound
+   Message an Outbound answers.
+3. Only then the pages: list, thread with its ~3s refresh, and `/dev`.
+
+Refactor step of the last slice: the maintained-activity column is the place duplication tends to
+appear — one writer, not one per call site.
+
+### Gates
+
+- [ ] `pnpm typecheck` green
+- [ ] `pnpm lint` green
+- [ ] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
+- [ ] Every acceptance criterion above checked off, or reported plainly as not done and why

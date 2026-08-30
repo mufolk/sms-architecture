@@ -26,3 +26,31 @@ not. Blind retry on a permanent error burns three attempts to reach the same con
 - [ ] **Test:** a permanent provider error produces one failed Inbound Message, one Failure Notice
       to the user, a Needs Attention flag, and no retry attempts
 - [ ] **Test:** a retryable error that succeeds on the second attempt produces no Failure Notice
+
+## How to work it
+
+Red → green → refactor, one criterion at a time, at the seam of ADR-0011. The loop and the gates
+are in [00-definition-of-done.md](./00-definition-of-done.md).
+
+### Test order
+
+Classification first: it is the decision every other behaviour in this ticket hangs off.
+
+1. A permanent provider error → one failed Inbound Message, one Failure Notice, a Needs Attention
+   flag, zero retry attempts. Assert the attempt count, not just the outcome.
+2. A retryable error succeeding on the second attempt → no Failure Notice.
+3. Bounded retries with exponential backoff plus jitter; exhausted work lands in the DLQ.
+4. The Failure Notice as an ordinary Outbound Message with its own lifecycle, sent through the
+   separate low-priority path.
+5. A failed Failure Notice generates no second notice — write this test explicitly, the loop is
+   the failure mode.
+6. Needs Attention on the list and in the thread.
+
+Retry timing is configuration set low in tests; never a real sleep in the suite.
+
+### Gates
+
+- [ ] `pnpm typecheck` green
+- [ ] `pnpm lint` green
+- [ ] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
+- [ ] Every acceptance criterion above checked off, or reported plainly as not done and why

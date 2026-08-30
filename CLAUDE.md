@@ -12,6 +12,8 @@ admin web interface over the history. See [ARCHITECTURE.md](./ARCHITECTURE.md).
 - `docs/adr/` — eleven short decision records. If your change contradicts one, say so rather than
   silently overriding it.
 - `.scratch/conversational-sms/spec.md` — the spec, and its Out of Scope list.
+- `.scratch/conversational-sms/issues/00-definition-of-done.md` — the TDD loop and the gates every
+  ticket is worked under.
 
 ## Non-negotiables
 
@@ -26,6 +28,11 @@ repositories, queue internals, or `packages/core` in isolation.
 - Messages are processed in arrival order and never reordered by provider timestamp (ADR-0007).
   Total ordering needs a wait window, and a wait window is guaranteed latency bought against a
   rare case.
+
+**Test-first, and the gates are the definition of done.** Red → green → refactor, one acceptance
+criterion per slice. Before a ticket is reported done, `pnpm verify` (typecheck, lint, test) is
+green — coverage included, at 90% for lines, branches, functions and statements. Never make a gate
+pass by lowering a threshold, silencing a rule or widening an exclude list.
 
 ## Work is ticketed
 
