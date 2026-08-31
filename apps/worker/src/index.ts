@@ -10,7 +10,10 @@ async function main() {
   const pool = new pg.Pool({ connectionString: env.DATABASE_URL });
   const redis = createWorkerRedis(env.REDIS_URL);
 
-  const consumer = createDefaultWorkerConsumer(pool, redis, env.PROCESSING_DELAY_MS);
+  const consumer = createDefaultWorkerConsumer(pool, redis, env, {
+    info: (payload, message) => log.info(payload, message),
+    error: (payload, message) => log.error(payload, message),
+  });
   log.info("Worker consumer started");
 
   async function shutdown() {

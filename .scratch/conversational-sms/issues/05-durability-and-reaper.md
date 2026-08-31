@@ -12,21 +12,21 @@ This ticket delivers the second centrepiece test, and the control point that mak
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A reaper runs periodically inside the worker process
-- [ ] It re-enqueues Inbound Messages left in the received state past a short threshold
-- [ ] It re-enqueues Inbound Messages left in the processing state past the job timeout, covering
+- [x] A reaper runs periodically inside the worker process
+- [x] It re-enqueues Inbound Messages left in the received state past a short threshold
+- [x] It re-enqueues Inbound Messages left in the processing state past the job timeout, covering
       a worker that died mid-flight
-- [ ] It reconciles Outbound Messages left queued past the send timeout against the provider, and
+- [x] It reconciles Outbound Messages left queued past the send timeout against the provider, and
       never blind-resends
-- [ ] Re-enqueuing is itself idempotent: a reaper pass that overlaps with a live job does not
+- [x] Re-enqueuing is itself idempotent: a reaper pass that overlaps with a live job does not
       cause duplicate work
-- [ ] The queue client used by the API is swappable at the composition root, so a test can make
+- [x] The queue client used by the API is swappable at the composition root, so a test can make
       the enqueue fail after the commit
-- [ ] **Centrepiece test:** with the enqueue failing after the commit, the reaper recovers the
+- [x] **Centrepiece test:** with the enqueue failing after the commit, the reaper recovers the
       Message and the reply still goes out
-- [ ] A test confirms that stopping the worker entirely does not stop ingestion: messages are
+- [x] A test confirms that stopping the worker entirely does not stop ingestion: messages are
       still accepted and are processed once it returns
 
 ## How to work it
@@ -54,7 +54,7 @@ literals scattered through the scan.
 
 ### Gates
 
-- [ ] `pnpm typecheck` green
-- [ ] `pnpm lint` green
-- [ ] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
-- [ ] Every acceptance criterion above checked off, or reported plainly as not done and why
+- [x] `pnpm typecheck` green
+- [x] `pnpm lint` green
+- [x] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
+- [x] Every acceptance criterion above checked off, or reported plainly as not done and why

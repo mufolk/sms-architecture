@@ -28,6 +28,10 @@ export function createFakeSmsProvider(): FakeSmsProvider {
       sent.push({ ...params, providerMessageSid });
       return { providerMessageSid };
     },
+    async lookupByIdempotencyKey(idempotencyKey: string): Promise<SendSmsResult | null> {
+      const existing = sent.find((message) => message.idempotencyKey === idempotencyKey);
+      return existing ? { providerMessageSid: existing.providerMessageSid } : null;
+    },
     sent,
     reset() {
       sent.length = 0;

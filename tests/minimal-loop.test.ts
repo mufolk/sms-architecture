@@ -53,6 +53,7 @@ function createSendCrashAfterSuccessProvider(
   return {
     name: base.name,
     verifySignature: (...args) => base.verifySignature(...args),
+    lookupByIdempotencyKey: (...args) => base.lookupByIdempotencyKey(...args),
     async send(params) {
       sendCalls += 1;
       const result = await base.send(params);
@@ -614,6 +615,10 @@ describe("minimal loop", () => {
       async enqueueAfterCommit(payload) {
         capturedJobs.push(payload);
       },
+      async reenqueueStaleInbound(payload) {
+        capturedJobs.push(payload);
+        return "enqueued";
+      },
     };
 
     const { app, pool: appPool, redis } = await buildApp({
@@ -706,6 +711,9 @@ describe("minimal loop", () => {
         );
         messagePersistedBeforeEnqueue = result.rows[0]?.status === "received";
       },
+      async reenqueueStaleInbound() {
+        return "enqueued";
+      },
     };
 
     const { app } = await buildApp({
@@ -738,6 +746,9 @@ describe("minimal loop", () => {
     const jobQueue: JobQueue = {
       async enqueueAfterCommit() {
         enqueueCount += 1;
+      },
+      async reenqueueStaleInbound() {
+        return "enqueued";
       },
     };
 
@@ -1042,7 +1053,13 @@ describe("worker bootstrap", () => {
 
   it("creates the default worker consumer", async () => {
     const redis = createWorkerRedis(infra.redisUrl);
-    const consumer = createDefaultWorkerConsumer(pool, redis, 0);
+    const consumer = createDefaultWorkerConsumer(pool, redis, {
+      PROCESSING_DELAY_MS: 0,
+      REAPER_INTERVAL_MS: 10_000,
+      REAPER_RECEIVED_THRESHOLD_MS: 30_000,
+      REAPER_JOB_TIMEOUT_MS: 30_000,
+      REAPER_SEND_TIMEOUT_MS: 30_000,
+    });
     try {
       await consumer.close();
     } finally {

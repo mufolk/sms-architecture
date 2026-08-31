@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { conversations, messages } from "@conversational-sms/core/schema";
@@ -180,6 +180,54 @@ export function createDrizzleMessageRepository(pool: Pool): MessageRepository {
           updatedAt: new Date(),
         })
         .where(eq(messages.id, messageId));
+    },
+
+    async findStaleInboundReceived(olderThan) {
+      const rows = await db
+        .select()
+        .from(messages)
+        .where(
+          and(
+            eq(messages.direction, "inbound"),
+            eq(messages.status, "received"),
+            lt(messages.createdAt, olderThan),
+          ),
+        )
+        .orderBy(asc(messages.createdAt), asc(messages.id));
+
+      return rows.map(mapMessage);
+    },
+
+    async findStaleInboundProcessing(olderThan) {
+      const rows = await db
+        .select()
+        .from(messages)
+        .where(
+          and(
+            eq(messages.direction, "inbound"),
+            eq(messages.status, "processing"),
+            lt(messages.updatedAt, olderThan),
+          ),
+        )
+        .orderBy(asc(messages.updatedAt), asc(messages.id));
+
+      return rows.map(mapMessage);
+    },
+
+    async findStaleOutboundQueued(olderThan) {
+      const rows = await db
+        .select()
+        .from(messages)
+        .where(
+          and(
+            eq(messages.direction, "outbound"),
+            eq(messages.status, "queued"),
+            lt(messages.updatedAt, olderThan),
+          ),
+        )
+        .orderBy(asc(messages.updatedAt), asc(messages.id));
+
+      return rows.map(mapMessage);
     },
   };
 }

@@ -6,6 +6,10 @@ const envSchema = z.object({
   REDIS_URL: z.string().url(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   PROCESSING_DELAY_MS: z.coerce.number().int().nonnegative().default(3000),
+  REAPER_INTERVAL_MS: z.coerce.number().int().positive().default(10_000),
+  REAPER_RECEIVED_THRESHOLD_MS: z.coerce.number().int().positive().default(30_000),
+  REAPER_JOB_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  REAPER_SEND_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
 });
 
 export type Env = z.infer<typeof envSchema>;

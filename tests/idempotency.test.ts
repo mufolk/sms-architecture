@@ -98,6 +98,7 @@ function createSendGateProvider(base: FakeSmsProvider): SmsProvider & { releaseS
   return {
     name: base.name,
     verifySignature: (...args) => base.verifySignature(...args),
+    lookupByIdempotencyKey: (...args) => base.lookupByIdempotencyKey(...args),
     async send(params) {
       await sendGate;
       return base.send(params);
