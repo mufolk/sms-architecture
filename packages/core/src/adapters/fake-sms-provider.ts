@@ -5,9 +5,17 @@ export type SentMessage = SendSmsParams & {
   providerMessageSid: string;
 };
 
+export type DeliveryReceiptStatus = "delivered" | "undelivered" | "failed";
+
 export type FakeSmsProvider = SmsProvider & {
   sent: SentMessage[];
   reset(): void;
+  emitDeliveryReceipt(params: {
+    statusCallbackUrl: string;
+    providerMessageSid: string;
+    status: DeliveryReceiptStatus;
+    errorCode?: string;
+  }): Promise<void>;
 };
 
 export function createFakeSmsProvider(): FakeSmsProvider {
@@ -31,6 +39,26 @@ export function createFakeSmsProvider(): FakeSmsProvider {
     async lookupByIdempotencyKey(idempotencyKey: string): Promise<SendSmsResult | null> {
       const existing = sent.find((message) => message.idempotencyKey === idempotencyKey);
       return existing ? { providerMessageSid: existing.providerMessageSid } : null;
+    },
+    async emitDeliveryReceipt(params) {
+      const fields: Record<string, string> = {
+        MessageSid: params.providerMessageSid,
+        MessageStatus: params.status,
+        SmsStatus: params.status,
+      };
+      if (params.errorCode) {
+        fields.ErrorCode = params.errorCode;
+      }
+
+      const response = await fetch(params.statusCallbackUrl, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(fields).toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Delivery receipt callback failed (${response.status})`);
+      }
     },
     sent,
     reset() {

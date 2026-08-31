@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 export function DevHandsetForm() {
+  const messageSidHintId = useId();
   const [userNumber, setUserNumber] = useState("+15550001");
   const [inboundNumber, setInboundNumber] = useState("+15559999");
   const [messageSid, setMessageSid] = useState("");
@@ -80,18 +81,22 @@ export function DevHandsetForm() {
         </label>
       </div>
 
-      <label className="block space-y-2 text-sm">
-        <span className="text-slate-300">MessageSid</span>
+      <div className="block space-y-2 text-sm">
+        <label htmlFor="dev-message-sid" className="text-slate-300">
+          MessageSid
+        </label>
         <input
+          id="dev-message-sid"
           value={messageSid}
           onChange={(event) => setMessageSid(event.target.value)}
           placeholder="Leave blank for a new SID, or paste one to simulate redelivery"
+          aria-describedby={messageSidHintId}
           className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-slate-100 outline-none ring-indigo-500/0 transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
         />
-        <span className="text-xs text-slate-400">
+        <p id={messageSidHintId} className="text-xs text-slate-400">
           Leave blank for a new message. Paste a previous SID to test idempotency (ADR-0004).
-        </span>
-      </label>
+        </p>
+      </div>
 
       <label className="block space-y-2 text-sm">
         <span className="text-slate-300">Message</span>

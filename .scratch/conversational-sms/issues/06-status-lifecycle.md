@@ -11,21 +11,25 @@ Message can become delivered or undelivered in front of the operator's eyes.
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] An Inbound Message moves through received, processing, and then processed or failed
-- [ ] An Outbound Message moves through queued, sent, and then delivered, undelivered or failed
-- [ ] Illegal transitions are rejected rather than silently applied
-- [ ] Every transition is recorded append-only, with the reason and the attempt that caused it
-- [ ] A Delivery Receipt endpoint accepts the provider's status callback and moves the Outbound
+- [x] An Inbound Message moves through received, processing, and then processed or failed
+      _(failed: machine defines `processing → failed`; no production path dispatches it yet — ticket 08)_
+- [x] An Outbound Message moves through queued, sent, and then delivered, undelivered or failed
+- [x] Illegal transitions are rejected rather than silently applied
+- [x] Every transition is recorded append-only, with the reason and the attempt that caused it
+- [x] A Delivery Receipt endpoint accepts the provider's status callback and moves the Outbound
       Message from sent to delivered or undelivered
-- [ ] A Delivery Receipt for an unknown Provider Message SID is handled without error
-- [ ] Delivery Receipts arriving out of order, or repeated, do not move a Message backwards
-- [ ] The fake provider can be told to emit a delivered or an undelivered receipt on demand, and
+- [x] A Delivery Receipt for an unknown Provider Message SID is handled without error
+- [x] Delivery Receipts arriving out of order, or repeated, do not move a Message backwards
+      _(guaranteed by `SELECT … FOR UPDATE` and `UPDATE … WHERE status = fromStatus` in
+      `transitionStatus`; not covered by test — the race is not observable from any seam this
+      repository accepts. Repeated and backwards transitions are tested at the ADR-0011 seam.)_
+- [x] The fake provider can be told to emit a delivered or an undelivered receipt on demand, and
       `/dev` exposes that
-- [ ] The admin shows the distinction between sent and delivered, and shows undelivered
+- [x] The admin shows the distinction between sent and delivered, and shows undelivered
       distinctly from failed
-- [ ] A test drives a send through to delivered and asserts the operator-visible status at each
+- [x] A test drives a send through to delivered and asserts the operator-visible status at each
       step
 
 ## How to work it
@@ -54,7 +58,7 @@ earned or lost.
 
 ### Gates
 
-- [ ] `pnpm typecheck` green
-- [ ] `pnpm lint` green
-- [ ] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
-- [ ] Every acceptance criterion above checked off, or reported plainly as not done and why
+- [x] `pnpm typecheck` green
+- [x] `pnpm lint` green
+- [x] `pnpm test` green, coverage at or above 90% on lines, branches, functions and statements
+- [x] Every acceptance criterion above checked off, or reported plainly as not done and why

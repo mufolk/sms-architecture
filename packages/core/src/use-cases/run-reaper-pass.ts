@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { JobQueue } from "../ports/job-queue.js";
 import type { MessageRepository } from "../ports/message-repository.js";
 import type { Message } from "../domain/types.js";
@@ -29,7 +30,7 @@ async function reenqueueInbound(
   const result = await deps.jobQueue.reenqueueStaleInbound({
     messageId: inbound.id,
     conversationId: inbound.conversationId,
-    correlationId: inbound.correlationId,
+    correlationId: randomUUID(),
     providerMessageSid: inbound.providerMessageSid,
   });
 
@@ -75,9 +76,24 @@ export async function runReaperPass(
       async () => {
         const providerResult = await deps.smsProvider.lookupByIdempotencyKey(outbound.id);
         if (providerResult) {
-          await deps.messageRepository.markOutboundSent(outbound.id, providerResult.providerMessageSid);
+          const correlationId = randomUUID();
+          await deps.messageRepository.transitionStatus({
+            messageId: outbound.id,
+            toStatus: "sent",
+            reason: "reaper-reconcile",
+            correlationId,
+            providerMessageSid: providerResult.providerMessageSid,
+          });
           if (outbound.inReplyTo) {
-            await deps.messageRepository.updateStatus(outbound.inReplyTo, "processed");
+            const inbound = await deps.messageRepository.findById(outbound.inReplyTo);
+            if (inbound && inbound.status !== "processed") {
+              await deps.messageRepository.transitionStatus({
+                messageId: outbound.inReplyTo,
+                toStatus: "processed",
+                reason: "reaper-reconcile",
+                correlationId,
+              });
+            }
           }
           deps.log?.info(
             {

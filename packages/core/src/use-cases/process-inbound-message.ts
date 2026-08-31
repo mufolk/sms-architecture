@@ -35,12 +35,17 @@ export async function processInboundMessage(
   );
 
   if (existingOutbound) {
-    await resumeExistingOutbound(deps, conversation, inbound, existingOutbound);
+    await resumeExistingOutbound(deps, conversation, inbound, existingOutbound, job.correlationId);
     return;
   }
 
   if (inbound.status === "received") {
-    await deps.messageRepository.updateStatus(inbound.id, "processing");
+    await deps.messageRepository.transitionStatus({
+      messageId: inbound.id,
+      toStatus: "processing",
+      reason: "worker-start",
+      correlationId: job.correlationId,
+    });
   } else if (inbound.status !== "processing") {
     return;
   }
@@ -55,7 +60,14 @@ export async function processInboundMessage(
     correlationId: job.correlationId,
   });
 
-  await sendOutboundAndMarkProcessed(deps, conversation, inbound, outbound, reply.body);
+  await sendOutboundAndMarkProcessed(
+    deps,
+    conversation,
+    inbound,
+    outbound,
+    reply.body,
+    job.correlationId,
+  );
 }
 
 async function resumeExistingOutbound(
@@ -63,14 +75,34 @@ async function resumeExistingOutbound(
   conversation: Conversation,
   inbound: Message,
   outbound: Message,
+  correlationId: string,
 ): Promise<void> {
   if (outbound.status === "queued") {
-    await sendOutboundAndMarkProcessed(deps, conversation, inbound, outbound, outbound.body);
+    await sendOutboundAndMarkProcessed(
+      deps,
+      conversation,
+      inbound,
+      outbound,
+      outbound.body,
+      correlationId,
+    );
     return;
   }
 
-  if (outbound.status === "sent" || outbound.status === "delivered") {
-    await deps.messageRepository.updateStatus(inbound.id, "processed");
+  if (
+    outbound.status === "sent" ||
+    outbound.status === "delivered" ||
+    outbound.status === "undelivered" ||
+    outbound.status === "failed"
+  ) {
+    if (inbound.status === "processing") {
+      await deps.messageRepository.transitionStatus({
+        messageId: inbound.id,
+        toStatus: "processed",
+        reason: "reply-already-sent",
+        correlationId,
+      });
+    }
   }
 }
 
@@ -80,6 +112,7 @@ async function sendOutboundAndMarkProcessed(
   inbound: Message,
   outbound: Message,
   body: string,
+  correlationId: string,
 ): Promise<void> {
   const sendResult = await deps.smsProvider.send({
     to: conversation.userNumber,
@@ -88,6 +121,18 @@ async function sendOutboundAndMarkProcessed(
     idempotencyKey: outbound.id,
   });
 
-  await deps.messageRepository.markOutboundSent(outbound.id, sendResult.providerMessageSid);
-  await deps.messageRepository.updateStatus(inbound.id, "processed");
+  await deps.messageRepository.transitionStatus({
+    messageId: outbound.id,
+    toStatus: "sent",
+    reason: "provider-accepted",
+    correlationId,
+    providerMessageSid: sendResult.providerMessageSid,
+  });
+
+  await deps.messageRepository.transitionStatus({
+    messageId: inbound.id,
+    toStatus: "processed",
+    reason: "reply-sent",
+    correlationId,
+  });
 }

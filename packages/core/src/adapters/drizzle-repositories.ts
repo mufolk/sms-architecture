@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
-import { conversations, messages } from "@conversational-sms/core/schema";
+import { conversations, messages, messageStatusEvents } from "@conversational-sms/core/schema";
+import {
+  IllegalStatusTransitionError,
+  isLegalTransition,
+  statusMatchesDirection,
+} from "../domain/status-transitions.js";
 import type { ConversationRepository } from "../ports/conversation-repository.js";
 import type {
   Conversation,
@@ -11,7 +16,7 @@ import type {
   MessageId,
   MessageStatus,
 } from "../domain/types.js";
-import type { MessageRepository } from "../ports/message-repository.js";
+import type { MessageRepository, TransitionStatusParams } from "../ports/message-repository.js";
 
 function mapConversation(row: typeof conversations.$inferSelect): Conversation {
   return {
@@ -106,6 +111,13 @@ export function createDrizzleMessageRepository(pool: Pool): MessageRepository {
         .returning();
 
       if (inserted) {
+        await db.insert(messageStatusEvents).values({
+          messageId: inserted.id,
+          fromStatus: null,
+          toStatus: "received",
+          reason: "webhook-ingest",
+          correlationId: params.correlationId,
+        });
         return { message: mapMessage(inserted), inserted: true };
       }
 
@@ -146,11 +158,33 @@ export function createDrizzleMessageRepository(pool: Pool): MessageRepository {
         throw new Error("Failed to insert outbound message");
       }
 
+      await db.insert(messageStatusEvents).values({
+        messageId: row.id,
+        fromStatus: null,
+        toStatus: "queued",
+        reason: "outbound-created",
+        correlationId: params.correlationId,
+      });
+
       return mapMessage(row);
     },
 
     async findById(id: MessageId) {
       const [row] = await db.select().from(messages).where(eq(messages.id, id)).limit(1);
+      return row ? mapMessage(row) : null;
+    },
+
+    async findByProviderSid(provider, providerMessageSid) {
+      const [row] = await db
+        .select()
+        .from(messages)
+        .where(
+          and(
+            eq(messages.provider, provider),
+            eq(messages.providerMessageSid, providerMessageSid),
+          ),
+        )
+        .limit(1);
       return row ? mapMessage(row) : null;
     },
 
@@ -164,22 +198,52 @@ export function createDrizzleMessageRepository(pool: Pool): MessageRepository {
       return rows.map(mapMessage);
     },
 
-    async updateStatus(messageId, status) {
-      await db
-        .update(messages)
-        .set({ status, updatedAt: new Date() })
-        .where(eq(messages.id, messageId));
-    },
+    async transitionStatus(params: TransitionStatusParams) {
+      await db.transaction(async (tx) => {
+        const [row] = await tx
+          .select()
+          .from(messages)
+          .where(eq(messages.id, params.messageId))
+          .for("update")
+          .limit(1);
 
-    async markOutboundSent(messageId, providerMessageSid) {
-      await db
-        .update(messages)
-        .set({
-          status: "sent",
-          providerMessageSid,
-          updatedAt: new Date(),
-        })
-        .where(eq(messages.id, messageId));
+        if (!row) {
+          throw new Error(`Message not found: ${params.messageId}`);
+        }
+
+        const fromStatus = row.status;
+        if (
+          !statusMatchesDirection(row.direction as Message["direction"], params.toStatus) ||
+          !isLegalTransition(row.direction as Message["direction"], fromStatus, params.toStatus)
+        ) {
+          throw new IllegalStatusTransitionError(params.messageId, fromStatus, params.toStatus);
+        }
+
+        const updated = await tx
+          .update(messages)
+          .set({
+            status: params.toStatus,
+            updatedAt: new Date(),
+            ...(params.errorCode !== undefined ? { errorCode: params.errorCode } : {}),
+            ...(params.providerMessageSid !== undefined
+              ? { providerMessageSid: params.providerMessageSid }
+              : {}),
+          })
+          .where(and(eq(messages.id, params.messageId), eq(messages.status, fromStatus)))
+          .returning({ id: messages.id });
+
+        if (updated.length === 0) {
+          throw new IllegalStatusTransitionError(params.messageId, fromStatus, params.toStatus);
+        }
+
+        await tx.insert(messageStatusEvents).values({
+          messageId: params.messageId,
+          fromStatus,
+          toStatus: params.toStatus,
+          reason: params.reason,
+          correlationId: params.correlationId,
+        });
+      });
     },
 
     async findStaleInboundReceived(olderThan) {

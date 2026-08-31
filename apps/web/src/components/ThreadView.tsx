@@ -21,6 +21,9 @@ export function ThreadView({
   const [paused, setPaused] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const prevCountRef = useRef(initialMessages.length);
+  const prevStatusesRef = useRef(
+    new Map(initialMessages.map((message) => [message.id, message.status])),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -83,12 +86,30 @@ export function ThreadView({
     }
 
     const prevCount = prevCountRef.current;
+    const prevStatuses = prevStatusesRef.current;
+    const announcements: string[] = [];
+
     if (messages.length > prevCount) {
       const newCount = messages.length - prevCount;
-      setAnnouncement(
+      announcements.push(
         `${newCount} new message${newCount === 1 ? "" : "s"} — ${messages.length} messages in this conversation.`,
       );
     }
+
+    for (const message of messages) {
+      const priorStatus = prevStatuses.get(message.id);
+      if (priorStatus && priorStatus !== message.status) {
+        announcements.push(
+          `${message.direction} message status changed from ${priorStatus} to ${message.status}.`,
+        );
+      }
+      prevStatuses.set(message.id, message.status);
+    }
+
+    if (announcements.length > 0) {
+      setAnnouncement(announcements.join(" "));
+    }
+
     prevCountRef.current = messages.length;
   }, [messages, paused]);
 
@@ -151,6 +172,11 @@ export function ThreadView({
               )}
               {!isInbound && message.inReplyTo ? (
                 <p className="mt-3 text-xs text-slate-400">Answers message {message.inReplyTo}</p>
+              ) : null}
+              {!isInbound && message.status !== "queued" ? (
+                <p className="mt-3 break-all font-mono text-xs text-slate-400">
+                  Provider Message SID: {message.providerMessageSid}
+                </p>
               ) : null}
             </article>
           );
